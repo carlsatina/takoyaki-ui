@@ -1,0 +1,23 @@
+{
+    "products": [
+        { "product_name": "Buko Juice 12 oz", "price": 55 },
+        { "product_name": "Buko Juice 16 oz", "price": 75 },
+        { "product_name": "Buko Juice 22 oz", "price": 80 },
+        { "product_name": "Buko Juice Large", "price": 130 },
+        { "product_name": "Buko Juice Medium", "price": 75 },
+        { "product_name": "Buko Juice Small", "price": 60 },
+        { "product_name": "Buko Shake 12 oz", "price": 60 },
+        { "product_name": "Buko Shake 16 oz", "price": 70 },
+        { "product_name": "Buko Shake 22 oz", "price": 80 },
+        { "product_name": "Buko Shake Large", "price": 85 },
+        { "product_name": "Buko Shake Medium", "price": 75 },
+        { "product_name": "Buko Shake Small", "price": 65 },
+        { "product_name": "Cheese Bomb", "price": 60 },
+        { "product_name": "Cheesy Bacon", "price": 70 },
+        { "product_name": "Kani Corn", "price": 60 },
+        { "product_name": "Octocheese", "price": 65 },
+        { "product_name": "Original Octopus", "price": 55 },
+        { "product_name": "Takoi Chizuiyaki", "price": 45 },
+        { "product_name": "Yasai", "price": 130 }
+    ]
+}

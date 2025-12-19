@@ -1,0 +1,166 @@
+<template>
+    <div class="card border-0 home-container">
+        <!-- New UI starts here -->
+        <div class="card-body home-inner" style="background-color: aliceblue;">
+
+            <div class="row p-1">
+                <div class="col-md-1"></div>
+                <div class="col-md-10">
+                    <table class="table table-striped">
+                        <thead class=thead-dark>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Short Description</th>
+                                <th>Category</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody >
+                            <tr v-for="item in productLists" :key="item.product_id">
+
+                                <td>{{item.product_name}}</td>
+                                <td>{{item.short_description}}</td>
+                                <td>{{item.category}}</td>
+                                <td>Edit</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-1"></div>
+            </div>
+        </div>
+        <!-- New UI ends here -->
+
+        <!-- Loading Modal -->
+        <Loading v-if="loading"/>
+    </div>
+
+    <!-- <div v-else>
+        loading...
+    </div> -->
+</template>
+
+<script>
+import { ref, provide, onBeforeMount } from 'vue'
+import { useRouter } from 'vue-router'
+import Modal from '@/components/Modal.vue'
+import Loading from '@/components/Loading.vue'
+import getProfile from '@/composables/getProfile'
+import getAllProduct from '@/composables/products/getAllProduct'
+import store from '@/store'
+
+export default {
+    name: "ListProductWeb",
+    components: {
+        Loading
+    },
+    setup() {
+        const router = useRouter()
+        const loading = ref(false)
+        const user = ref(null)
+        const productLists = ref({});
+
+        const userToken = localStorage.getItem('token')
+
+        if (!userToken) {
+            router.push('/login')
+        }
+
+        provide('store', store)
+
+        onBeforeMount(async() => {
+            if (!store.state.isUserLoggedIn) {
+                router.push('/login')
+            }
+
+            loading.value = true
+            const { response, error } = await getAllProduct(userToken)
+            if (error.value === null) {
+                productLists.value = response.value
+            }
+            loading.value = false
+        })
+
+        return {
+            router,
+            loading,
+            user,
+            productLists,
+        }
+    }
+}
+</script>
+
+<style scoped>
+.suggestions {
+    padding: 3px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: .2s all;
+}
+
+.suggestions:hover{
+    transform: scale(1.2)
+}
+
+.service-info {
+    font-size: 14px;
+}
+.contact-info {
+    font-size: 14px
+}
+.service-label {
+    font-size: 12px;
+}
+
+.service-value {
+    font-size: 14px;
+}
+.addr {
+    white-space: nowrap;
+    width: calc(100% - 20px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}.serv {
+    white-space: nowrap;
+    width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.persons {
+    display: grid;
+    grid-template-columns: 100px 1fr 50px;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+}
+
+.service-table:hover {
+    background-color: #F1F0E8;
+}
+
+.home-container {
+    height: 90vh;
+    overflow: scroll;
+}
+
+.home-inner {
+    height: 90vh;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.popular-services-container::-webkit-scrollbar {
+    display: none;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: all 0.6s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+</style>
