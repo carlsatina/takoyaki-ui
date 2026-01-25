@@ -33,28 +33,30 @@
         </div>
         <div class="col-md-3"></div>
     </div> -->
-    <div class="row mt-3">
-        <div class="col-md-3"></div>
-        <div class="col-md-6 d-flex flex-column align-items-start">
-            <input type="email" class="form-control shadow-sm" placeholder="Email address" v-model="email"/>
+    <form class="w-100" @submit.prevent="handleLogin">
+        <div class="row mt-3">
+            <div class="col-md-3"></div>
+            <div class="col-md-6 d-flex flex-column align-items-start">
+                <input type="email" class="form-control shadow-sm" placeholder="Email address" v-model="email"/>
+            </div>
+            <div class="col-md-3"></div>
         </div>
-        <div class="col-md-3"></div>
-    </div>
-    <div class="row mt-2">
-        <div class="col-md-3"></div>
-        <div class="col-md-6  d-flex flex-column align-items-start">
-            <input type="password" class="form-control shadow-sm" placeholder="Password" v-model="password" @keypress.enter="handleLogin"/>
-            <div v-if="hasError" class="error-message small text-danger"><strong>{{errorMsg}}</strong></div>
+        <div class="row mt-2">
+            <div class="col-md-3"></div>
+            <div class="col-md-6  d-flex flex-column align-items-start">
+                <input type="password" class="form-control shadow-sm" placeholder="Password" v-model="password"/>
+                <div v-if="hasError" class="error-message small text-danger"><strong>{{errorMsg}}</strong></div>
+            </div>
+            <div class="col-md-3"></div>
         </div>
-        <div class="col-md-3"></div>
-    </div>
-    <div class="row mt-4">
-        <div class="col-md-3"></div>
-        <div class="col-md-6  d-flex flex-column align-items-start">
-            <button type="button" class="btn btn-success w-100 login fw-bold" @click="handleLogin">Log In</button>
+        <div class="row mt-4">
+            <div class="col-md-3"></div>
+            <div class="col-md-6  d-flex flex-column align-items-start">
+                <button type="submit" class="btn btn-success w-100 login fw-bold">Log In</button>
+            </div>
+            <div class="col-md-3"></div>
         </div>
-        <div class="col-md-3"></div>
-    </div>
+    </form>
     <div class="row mt-2">
         <div class="col-md-3"></div>
         <div class="col-md-6  d-flex flex-row justify-content-between">
