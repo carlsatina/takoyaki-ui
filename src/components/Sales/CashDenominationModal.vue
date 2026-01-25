@@ -19,6 +19,18 @@
           </div>
           <div class="row g-2">
             <div class="col-4">
+              <label class="form-label small mb-1">1000</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                class="form-control form-control-sm"
+                :value="displayDraft.bill_1000"
+                :disabled="readOnly"
+                @input="updateField('bill_1000', $event.target.value)"
+              />
+            </div>
+            <div class="col-4">
               <label class="form-label small mb-1">500</label>
               <input
                 type="number"

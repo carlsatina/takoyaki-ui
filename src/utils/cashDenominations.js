@@ -11,6 +11,7 @@ export const toNonNegativeFloat = (val) => {
 }
 
 export const normalizeDenominations = (entry = {}) => ({
+  bill_1000: toNonNegativeInt(entry?.bill_1000),
   bill_500: toNonNegativeInt(entry?.bill_500),
   bill_200: toNonNegativeInt(entry?.bill_200),
   bill_100: toNonNegativeInt(entry?.bill_100),
@@ -23,6 +24,7 @@ export const getDenomBreakdown = (entry = {}) => {
   const normalized = normalizeDenominations(entry)
 
   const hasBreakdown =
+    normalized.bill_1000 > 0 ||
     normalized.bill_500 > 0 ||
     normalized.bill_200 > 0 ||
     normalized.bill_100 > 0 ||
@@ -31,6 +33,7 @@ export const getDenomBreakdown = (entry = {}) => {
     normalized.coins > 0
 
   const total =
+    normalized.bill_1000 * 1000 +
     normalized.bill_500 * 500 +
     normalized.bill_200 * 200 +
     normalized.bill_100 * 100 +

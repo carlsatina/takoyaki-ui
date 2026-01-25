@@ -48,15 +48,21 @@
                                     <th style="width: 50%;">Inventory Item</th>
                                     <th class="text-center">Unit</th>
                                     <th class="text-center">Current Stock</th>
+                                    <th class="text-center">Start Stock</th>
                                     <th class="text-center">Stock (used)</th>
                                 </tr>
                             </thead>
                             <tbody >
-                                <tr v-for="item in paginatedData" :key="item.id" @click="openEdit(item)" style="cursor:pointer;">
+                                <tr v-for="item in paginatedData" :key="item.id">
 
                                     <td>{{item.name}}</td>
                                     <td class="text-center">{{item.unit || '-'}}</td>
-                                    <td class="text-center">{{formatNumber(item.current_stock)}}</td>
+                                    <td class="text-center clickable-cell" @click="openEdit(item, 'current')">
+                                        {{formatNumber(item.current_stock)}}
+                                    </td>
+                                    <td class="text-center clickable-cell" @click="openEdit(item, 'start')">
+                                        {{formatNumber(item.start_stock)}}
+                                    </td>
                                     <td class="text-center">{{formatNumber(item.used_quantity)}}</td>
                                 </tr>
                             </tbody>
@@ -84,12 +90,12 @@
     <div v-if="editItem" class="modal-overlay" @click="closeEdit">
         <div class="modal-content" @click.stop>
             <div class="modal-header">
-                <h5 class="modal-title">Update Stock</h5>
+                <h5 class="modal-title">{{ editTitle }}</h5>
                 <button type="button" class="btn-close" @click="closeEdit"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-2"><strong>{{ editItem.name }}</strong></div>
-                <label class="form-label">Current Stock ({{ editItem.unit || '-' }})</label>
+                <label class="form-label">{{ editLabel }} ({{ editItem.unit || '-' }})</label>
                 <input type="number" class="form-control" v-model.number="editStock" step="0.001" />
             </div>
             <div class="modal-footer">
@@ -200,6 +206,7 @@ export default {
         const customEnd = ref('')
         const editItem = ref(null)
         const editStock = ref(0)
+        const editField = ref('current')
 
         if (!userToken) {
             router.push('/login')
@@ -220,6 +227,15 @@ export default {
         const formatNumber = (value) => {
             const num = Number(value) || 0
             return num.toFixed(3)
+        }
+
+        const dateKey = (val) => {
+            if (!val) return ''
+            const d = new Date(val)
+            const year = d.getFullYear()
+            const month = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            return `${year}-${month}-${day}`
         }
 
         const startOfWeek = (d) => {
@@ -359,22 +375,36 @@ export default {
         }
 
         const isTodaySelected = computed(() => viewMode.value === 'daily' && new Date(baseDate.value).toDateString() === new Date().toDateString())
+
+        const startStockDate = computed(() => {
+            const { start } = buildRange()
+            return start ? dateKey(start) : dateKey(new Date())
+        })
         
-        const openEdit = (item) => {
+        const openEdit = (item, field) => {
             editItem.value = item
-            editStock.value = Number(item.current_stock) || 0
+            editField.value = field
+            editStock.value =
+              field === 'start'
+                ? (Number(item.start_stock) || 0)
+                : (Number(item.current_stock) || 0)
         }
 
         const closeEdit = () => {
             editItem.value = null
             editStock.value = 0
+            editField.value = 'current'
         }
 
         const saveStock = async () => {
             if (!editItem.value) return
             loading.value = true
             const token = localStorage.getItem('token')
-            await updateInventoryStock(editItem.value.id, editStock.value, token)
+            const payload =
+              editField.value === 'start'
+                ? { start_stock: editStock.value, record_date: startStockDate.value }
+                : { current_stock: editStock.value }
+            await updateInventoryStock(editItem.value.id, payload, token)
             loading.value = false
             closeEdit()
             await fetchUsage()
@@ -385,6 +415,13 @@ export default {
             currentPage.value = 1
             fetchUsage()
         })
+
+        const editTitle = computed(() =>
+          editField.value === 'start' ? 'Update Start Stock' : 'Update Current Stock'
+        )
+        const editLabel = computed(() =>
+          editField.value === 'start' ? 'Start Stock' : 'Current Stock'
+        )
 
         return {
             router,
@@ -410,11 +447,14 @@ export default {
             applyCustomRange,
             selectToday,
             isTodaySelected,
+            startStockDate,
             openEdit,
             closeEdit,
             saveStock,
             editItem,
             editStock,
+            editTitle,
+            editLabel,
             searchTerm
         }
     }
@@ -474,6 +514,9 @@ select option {
 .tight-table li {
     margin: 0;
     padding: 0;
+}
+.clickable-cell {
+    cursor: pointer;
 }
 :deep(.dataTable.table tbody tr) {
   height: 24px !important;

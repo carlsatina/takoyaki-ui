@@ -102,7 +102,23 @@
               <td><input type="number" class="form-control form-control-sm" v-model.number="newRowStaff(1).gcash" @input="updateNewRowTotals" /></td>
               <td><input type="number" class="form-control form-control-sm" v-model.number="newRowStaff(0).gcash" @input="updateNewRowTotals" /></td>
               <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" v-model.number="newRow.senior_discount" disabled/></td>
-              <td><input type="number" class="form-control form-control-sm" v-model.number="newRow.expense" /></td>
+              <td>
+                <div class="input-group input-group-sm">
+                  <input
+                    type="number"
+                    class="form-control"
+                    :value="expenseTotal(newRow)"
+                    disabled
+                  />
+                  <button
+                    class="btn"
+                    type="button"
+                    :class="hasExpenseBreakdown(newRow) ? 'btn-outline-success' : 'btn-outline-secondary'"
+                    title="Enter expense breakdown"
+                    @click="openExpenseModal('new')"
+                  >BD</button>
+                </div>
+              </td>
               <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" :value="totalGcash(newRow)" disabled /></td>
               <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" :value="totalCoh(newRow)" disabled /></td>
               <td v-if="!isStaffOnly" class="highlight"><input type="number" class="form-control form-control-sm" :value="calcTotalSales(newRow)" disabled /></td>
@@ -162,7 +178,23 @@
                 <td><input type="number" class="form-control form-control-sm" v-model.number="editingStaff(1).gcash" @input="updateEditTotals" /></td>
                 <td><input type="number" class="form-control form-control-sm" v-model.number="editingStaff(0).gcash" @input="updateEditTotals" /></td>
                 <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" v-model.number="editingEntry.senior_discount" disabled/></td>
-                <td><input type="number" class="form-control form-control-sm" v-model.number="editingEntry.expense" /></td>
+                <td>
+                  <div class="input-group input-group-sm">
+                    <input
+                      type="number"
+                      class="form-control"
+                      :value="expenseTotal(editingEntry)"
+                      disabled
+                    />
+                    <button
+                      class="btn"
+                      type="button"
+                      :class="hasExpenseBreakdown(editingEntry) ? 'btn-outline-success' : 'btn-outline-secondary'"
+                      title="Enter expense breakdown"
+                      @click="openExpenseModal('edit')"
+                    >BD</button>
+                  </div>
+                </td>
                 <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" :value="totalGcash(editingEntry)" disabled /></td>
                 <td v-if="!isStaffOnly"><input type="number" class="form-control form-control-sm" :value="totalCoh(editingEntry)" disabled /></td>
                 <td v-if="!isStaffOnly" class="highlight"><input type="number" class="form-control form-control-sm" :value="calcTotalSales(editingEntry)" disabled /></td>
@@ -203,7 +235,13 @@
                 <td>{{ formatNumber(staffField(entry, 1, 'gcash')) }}</td>
                 <td>{{ formatNumber(staffField(entry, 0, 'gcash')) }}</td>
                 <td v-if="!isStaffOnly">{{ formatNumber(entry.senior_discount) }}</td>
-                <td>{{ formatNumber(entry.expense) }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="coh-clickable"
+                    @click="openExpenseModal('view', entry)"
+                  >{{ formatNumber(expenseTotal(entry)) }}</button>
+                </td>
                 <td v-if="!isStaffOnly">{{ formatNumber(totalGcash(entry)) }}</td>
                 <td v-if="!isStaffOnly">{{ formatNumber(totalCoh(entry)) }}</td>
                 <td v-if="!isStaffOnly" class="highlight">{{ formatNumber(calcTotalSales(entry)) }}</td>
@@ -291,6 +329,16 @@
       @clear="clearDenomDraft"
       @apply="applyDenomModal"
     />
+
+    <ExpenseBreakdownModal
+      :visible="showExpenseModal"
+      :read-only="expenseReadOnly"
+      v-model="expenseDraft"
+      :format-number="formatNumber"
+      @close="closeExpenseModal"
+      @clear="clearExpenseDraft"
+      @apply="applyExpenseModal"
+    />
   </div>
 </template>
 
@@ -298,6 +346,7 @@
 import { ref, onBeforeMount, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CashDenominationModal from '@/components/Sales/CashDenominationModal.vue'
+import ExpenseBreakdownModal from '@/components/Sales/ExpenseBreakdownModal.vue'
 import DuplicateDateModal from '@/components/Sales/DuplicateDateModal.vue'
 import addDailySales from '@/composables/dailySales/addDailySales'
 import getDailySales from '@/composables/dailySales/getDailySales'
@@ -314,6 +363,7 @@ export default {
   name: 'DailySalesWeb',
   components: {
     CashDenominationModal,
+    ExpenseBreakdownModal,
     DuplicateDateModal
   },
   setup() {
@@ -337,6 +387,7 @@ export default {
     const showDenomModal = ref(false)
     const denomContext = ref({ mode: 'new', staffIndex: 0 })
     const denomDraft = ref({
+      bill_1000: 0,
       bill_500: 0,
       bill_200: 0,
       bill_100: 0,
@@ -345,6 +396,9 @@ export default {
       coins: 0
     })
     const denomSavedCoh = ref(0)
+    const showExpenseModal = ref(false)
+    const expenseContext = ref({ mode: 'new', entry: null })
+    const expenseDraft = ref([])
     const isStaffOnly = ref(false)
     const userToken = localStorage.getItem('token')
 
@@ -355,6 +409,7 @@ export default {
       total_gcash: 0,
       senior_discount: 0,
       expense: 0,
+      expense_breakdown: [{ name: '', amount: 0 }],
       pos_cash_on_hand: 0,
       actual_cash_on_hand: 0,
       cash_goal: 0,
@@ -454,6 +509,7 @@ export default {
         staff_id: s.id,
         cash_on_hand: 0,
         gcash: 0,
+        bill_1000: 0,
         bill_500: 0,
         bill_200: 0,
         bill_100: 0,
@@ -519,6 +575,7 @@ export default {
             staff_id: id,
             cash_on_hand: 0,
             gcash: 0,
+            bill_1000: 0,
             bill_500: 0,
             bill_200: 0,
             bill_100: 0,
@@ -538,6 +595,7 @@ export default {
           staff_id: staffIdByIndex(result.length),
           cash_on_hand: 0,
           gcash: 0,
+          bill_1000: 0,
           bill_500: 0,
           bill_200: 0,
           bill_100: 0,
@@ -576,6 +634,7 @@ export default {
         total_gcash: 0,
         senior_discount: 0,
         expense: 0,
+        expense_breakdown: [{ name: '', amount: 0 }],
         pos_cash_on_hand: 0,
         actual_cash_on_hand: 0,
         cash_goal: 0,
@@ -613,6 +672,7 @@ export default {
     const isDenomBreakdownActive = (staffEntry) => getDenomBreakdown(staffEntry).hasBreakdown
 
     const denomReadOnly = computed(() => denomContext.value?.mode === 'view')
+    const expenseReadOnly = computed(() => expenseContext.value?.mode === 'view')
 
     const isPastDate = (dateStr) => {
       if (!dateStr) return false
@@ -638,6 +698,7 @@ export default {
       const entry = staffEntryFor(dailySalesEntry, staffIndex)
       denomSavedCoh.value = Number(entry?.cash_on_hand) || 0
       denomDraft.value = {
+        bill_1000: entry?.bill_1000 || 0,
         bill_500: entry?.bill_500 || 0,
         bill_200: entry?.bill_200 || 0,
         bill_100: entry?.bill_100 || 0,
@@ -652,6 +713,7 @@ export default {
       denomContext.value = { mode, staffIndex }
       const entry = mode === 'edit' ? editingStaff(staffIndex) : newRowStaff(staffIndex)
       denomDraft.value = {
+        bill_1000: entry?.bill_1000 || 0,
         bill_500: entry?.bill_500 || 0,
         bill_200: entry?.bill_200 || 0,
         bill_100: entry?.bill_100 || 0,
@@ -669,6 +731,7 @@ export default {
 
     const clearDenomDraft = () => {
       denomDraft.value = {
+        bill_1000: 0,
         bill_500: 0,
         bill_200: 0,
         bill_100: 0,
@@ -688,6 +751,7 @@ export default {
       }
 
       Object.assign(entry, {
+        bill_1000: breakdown.bill_1000,
         bill_500: breakdown.bill_500,
         bill_200: breakdown.bill_200,
         bill_100: breakdown.bill_100,
@@ -718,10 +782,12 @@ export default {
       const payload = { ...newRow.value }
       updateNewRowTotals()
       payload.cash_needed_for_goal = calcSalesNeeded(newRow.value)
+      payload.expense_breakdown = normalizeExpenseBreakdown(payload.expense_breakdown)
       payload.staff_cash_entries = (payload.staff_cash_entries || []).map((s, idx) => ({
         staff_id: s.staff_id ?? staffIdByIndex(idx) ?? null,
         cash_on_hand: s.cash_on_hand || 0,
         gcash: s.gcash || 0,
+        bill_1000: s.bill_1000 || 0,
         bill_500: s.bill_500 || 0,
         bill_200: s.bill_200 || 0,
         bill_100: s.bill_100 || 0,
@@ -767,6 +833,7 @@ export default {
                 staff_id: entry.staff_id,
                 cash_on_hand: entry.cash_on_hand || 0,
                 gcash: entry.gcash || 0,
+                bill_1000: entry.bill_1000 || 0,
                 bill_500: entry.bill_500 || 0,
                 bill_200: entry.bill_200 || 0,
                 bill_100: entry.bill_100 || 0,
@@ -782,6 +849,11 @@ export default {
             targetRow.staff_cash_entries || targetRow.staffCashEntries || []
           )
 
+      const normalizedMatchBreakdown = normalizeExpenseBreakdown(match?.expense_breakdown)
+      const fallbackBreakdown = Array.isArray(targetRow.expense_breakdown)
+        ? targetRow.expense_breakdown
+        : []
+
       Object.assign(targetRow, {
         record_date: key,
         total_sales: salesMetrics?.total_sales ?? match?.total_sales ?? 0,
@@ -789,6 +861,7 @@ export default {
         total_gcash: match?.total_gcash ?? targetRow.total_gcash ?? 0,
         senior_discount: salesMetrics?.senior_discount ?? match?.senior_discount ?? 0,
         expense: match?.expense ?? 0,
+        expense_breakdown: normalizedMatchBreakdown.length ? normalizedMatchBreakdown : fallbackBreakdown,
         pos_cash_on_hand: salesMetrics?.pos_cash_on_hand ?? match?.pos_cash_on_hand ?? 0,
         actual_cash_on_hand: match?.actual_cash_on_hand ?? 0,
         cash_goal: match?.cash_goal ?? 0,
@@ -815,6 +888,83 @@ export default {
       return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
     }
 
+    const normalizeExpenseBreakdown = (val) => {
+      let raw = val
+      if (raw === undefined || raw === null || raw === '') return []
+      if (typeof raw === 'string') {
+        try {
+          raw = JSON.parse(raw)
+        } catch (err) {
+          return []
+        }
+      }
+      if (!Array.isArray(raw)) return []
+      return raw
+        .map((item) => {
+          const name = typeof item?.name === 'string' ? item.name.trim() : ''
+          const amountRaw = item?.amount ?? item?.value ?? item?.cost
+          const amountNum = Number(amountRaw)
+          const amount = Number.isFinite(amountNum) ? amountNum : 0
+          return { name, amount }
+        })
+        .filter((item) => item.name.length > 0 || item.amount !== 0)
+    }
+
+    const expenseTotal = (entry) => {
+      if (!entry) return 0
+      const raw = entry.expense_breakdown
+      const list = normalizeExpenseBreakdown(raw)
+      if (Array.isArray(raw) || typeof raw === 'string') {
+        return list.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+      }
+      return Number(entry.expense) || 0
+    }
+
+    const hasExpenseBreakdown = (entry) =>
+      normalizeExpenseBreakdown(entry?.expense_breakdown).length > 0
+
+    const buildExpenseDraft = (entry, mode) => {
+      const normalized = normalizeExpenseBreakdown(entry?.expense_breakdown)
+      if (mode === 'view') {
+        if (normalized.length) return normalized
+        const fallbackAmount = Number(entry?.expense) || 0
+        return fallbackAmount ? [{ name: 'Expense', amount: fallbackAmount }] : []
+      }
+      return normalized.length ? normalized : [{ name: '', amount: 0 }]
+    }
+
+    const openExpenseModal = (mode, entry = null) => {
+      expenseContext.value = { mode, entry }
+      const source =
+        mode === 'edit'
+          ? editingEntry.value
+          : mode === 'new'
+            ? newRow.value
+            : entry
+      expenseDraft.value = buildExpenseDraft(source, mode)
+      showExpenseModal.value = true
+    }
+
+    const closeExpenseModal = () => {
+      showExpenseModal.value = false
+    }
+
+    const clearExpenseDraft = () => {
+      expenseDraft.value = []
+    }
+
+    const applyExpenseModal = () => {
+      const normalized = normalizeExpenseBreakdown(expenseDraft.value)
+      if (expenseContext.value?.mode === 'edit' && editingEntry.value) {
+        editingEntry.value.expense_breakdown = normalized
+        updateEditTotals()
+      } else if (expenseContext.value?.mode === 'new') {
+        newRow.value.expense_breakdown = normalized
+        updateNewRowTotals()
+      }
+      showExpenseModal.value = false
+    }
+
     const staffField = (entry, idx, key) => {
       const list = entry.staffCashEntries || entry.staff_cash_entries || []
       const item = findStaffEntryByIndex(list, idx)
@@ -836,7 +986,7 @@ export default {
       const totalG = totalGcash(entry)
       const totalC = totalCoh(entry)
       const sd = Number(entry.senior_discount) || 0
-      const exp = Number(entry.expense) || 0
+      const exp = expenseTotal(entry)
       return totalG + totalC + sd + exp
     }
 
@@ -932,7 +1082,7 @@ export default {
           case 'senior_discount':
             return acc + (Number(entry.senior_discount) || 0)
           case 'expense':
-            return acc + (Number(entry.expense) || 0)
+            return acc + (Number(expenseTotal(entry)) || 0)
           case 'total_gcash':
             return acc + (Number(totalGcash(entry)) || 0)
           case 'total_coh':
@@ -982,6 +1132,7 @@ export default {
 
     const updateNewRowTotals = () => {
       ensureNewRowStaffLength()
+      newRow.value.expense = expenseTotal(newRow.value)
       newRow.value.total_gcash = totalGcash(newRow.value)
       newRow.value.total_cash_on_hand = totalCoh(newRow.value)
       newRow.value.total_sales = calcTotalSales(newRow.value)
@@ -1001,6 +1152,12 @@ export default {
       editingEntry.value.staffCashEntries = alignEntriesToStaffOrder(editingEntry.value.staffCashEntries)
       editingEntry.value.staff_cash_entries = editingEntry.value.staffCashEntries
       editingEntry.value.record_date = dateKey(editingEntry.value.record_date)
+      if (!Array.isArray(editingEntry.value.expense_breakdown) || !editingEntry.value.expense_breakdown.length) {
+        const existingExpense = Number(editingEntry.value.expense) || 0
+        editingEntry.value.expense_breakdown = existingExpense
+          ? [{ name: 'Expense', amount: existingExpense }]
+          : [{ name: '', amount: 0 }]
+      }
       updateEditTotals()
     }
 
@@ -1009,6 +1166,7 @@ export default {
     const updateEditTotals = () => {
       if (!editingEntry.value) return
       const wrap = { staffCashEntries: editingEntry.value.staffCashEntries }
+      editingEntry.value.expense = expenseTotal(editingEntry.value)
       editingEntry.value.total_gcash = totalGcash(wrap)
       editingEntry.value.total_cash_on_hand = totalCoh(wrap)
       editingEntry.value.total_sales = calcTotalSales(editingEntry.value)
@@ -1032,6 +1190,7 @@ export default {
         total_gcash: editingEntry.value.total_gcash,
         senior_discount: editingEntry.value.senior_discount,
         expense: editingEntry.value.expense,
+        expense_breakdown: normalizeExpenseBreakdown(editingEntry.value.expense_breakdown),
         pos_cash_on_hand: editingEntry.value.pos_cash_on_hand,
         actual_cash_on_hand: editingEntry.value.actual_cash_on_hand,
         cash_goal: editingEntry.value.cash_goal,
@@ -1040,6 +1199,7 @@ export default {
           staff_id: s.staff_id ?? staffIdByIndex(idx),
           cash_on_hand: s.cash_on_hand || 0,
           gcash: s.gcash || 0,
+          bill_1000: s.bill_1000 || 0,
           bill_500: s.bill_500 || 0,
           bill_200: s.bill_200 || 0,
           bill_100: s.bill_100 || 0,
@@ -1147,6 +1307,8 @@ export default {
       staffLabels,
       totalCoh,
       totalGcash,
+      expenseTotal,
+      hasExpenseBreakdown,
       updateNewRowTotals,
       isStaffOnly,
       startEdit,
@@ -1190,7 +1352,14 @@ export default {
       openViewDenomModal,
       closeDenomModal,
       clearDenomDraft,
-      applyDenomModal
+      applyDenomModal,
+      showExpenseModal,
+      expenseDraft,
+      expenseReadOnly,
+      openExpenseModal,
+      closeExpenseModal,
+      clearExpenseDraft,
+      applyExpenseModal
     }
   }
 }
