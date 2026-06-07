@@ -15,6 +15,10 @@
                     <span class="text-muted" style="font-size: 14px;">{{ currentDate }}</span>
                     <span v-if="currentCategory" class="badge bg-info ms-2 text-dark">Category: {{ currentCategory }}</span>
                     <span v-if="currentPaymentMode" class="badge bg-warning text-dark ms-2">Payment: {{ currentPaymentMode }}</span>
+                    <button class="btn btn-success btn-sm ms-2 d-flex align-items-center gap-1" @click="exportToCSV">
+                        <mdicon name="download" size="16"/>
+                        Export CSV
+                    </button>
                 </div>
                 <div class="row p-1">
                     <hr>
@@ -228,6 +232,38 @@ export default {
             return Math.ceil((filteredSales.value?.length || 0) / itemsPerPage.value)
         })
 
+        const exportToCSV = () => {
+            const rows = [['sale_id', 'date', 'payment_mode', 'product_name', 'category', 'quantity', 'unit_price', 'line_total', 'sale_total']]
+            for (const sale of filteredSales.value) {
+                const dateStr = new Date(sale.date).toLocaleString()
+                if (sale.saleItems && sale.saleItems.length > 0) {
+                    for (const item of sale.saleItems) {
+                        rows.push([
+                            sale.id,
+                            dateStr,
+                            sale.payment_mode,
+                            item.product?.product_name ?? '',
+                            item.product?.category ?? '',
+                            item.quantity,
+                            item.unit_price,
+                            (item.quantity * item.unit_price).toFixed(2),
+                            sale.total.toFixed(2)
+                        ])
+                    }
+                } else {
+                    rows.push([sale.id, dateStr, sale.payment_mode, '', '', '', '', '', sale.total.toFixed(2)])
+                }
+            }
+            const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `sales_${currentDate.value.replace(/[^a-zA-Z0-9-]/g, '_')}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
         console.log("SalesData: ", salesData.value);
         return {
             router,
@@ -244,7 +280,8 @@ export default {
             paginatedData,
             totalPages,
             currentCategory,
-            currentPaymentMode
+            currentPaymentMode,
+            exportToCSV
         }
     }
 }

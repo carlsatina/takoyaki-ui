@@ -6,6 +6,10 @@
                 <mdicon name="arrow-left" size="24"/>
             </button>
             <h4 class="page-title">Sales by Items</h4>
+            <button class="export-btn" @click="exportToCSV" :disabled="exportLoading">
+                <mdicon name="download" size="18" class="me-1"/>
+                {{ exportLoading ? 'Exporting...' : 'Export CSV' }}
+            </button>
         </div>
 
         <!-- Date Navigation -->
@@ -172,6 +176,7 @@ import { useRouter } from 'vue-router'
 import Loading from '@/components/Loading.vue'
 import getSalesReport from '@/composables/reports/getSalesReport'
 import getTopSellingItemByDateRange from '@/composables/reports/getTopSellingItemByDateRange'
+import getSales from '@/composables/sales/getSales'
 import store from '@/store'
 import takoyakiImg from '@/assets/takoyaki-circle.png'
 import bukoImg from '@/assets/Buko.png'
@@ -197,6 +202,8 @@ export default {
         const endDate = ref()
         const topSellingItem = ref(null)
         
+        const exportLoading = ref(false)
+
         const stats = ref({
             "Buko": 0,
             "Takoyaki": 0
@@ -342,6 +349,71 @@ export default {
             }
         }
 
+        const exportToCSV = async () => {
+            exportLoading.value = true
+            try {
+                const d = new Date(currentDate.value)
+                let start, end
+
+                if (viewMode.value === 'daily') {
+                    start = end = d.toISOString().split('T')[0]
+                } else if (viewMode.value === 'weekly') {
+                    const s = new Date(d)
+                    s.setDate(d.getDate() - d.getDay())
+                    const e = new Date(s)
+                    e.setDate(s.getDate() + 6)
+                    start = s.toISOString().split('T')[0]
+                    end = e.toISOString().split('T')[0]
+                } else if (viewMode.value === 'monthly') {
+                    start = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]
+                    end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]
+                } else if (viewMode.value === 'custom' && startDate.value && endDate.value) {
+                    start = startDate.value.toISOString().split('T')[0]
+                    end = endDate.value.toISOString().split('T')[0]
+                }
+
+                if (!start || !end) return
+
+                const { response, error } = await getSales(userToken, null, true, start, end)
+                if (error.value !== null || !response.value) return
+
+                const sales = response.value
+                const rows = [['sale_id', 'date', 'payment_mode', 'product_name', 'category', 'quantity', 'unit_price', 'line_total', 'sale_total']]
+
+                for (const sale of sales) {
+                    const dateStr = new Date(sale.date).toLocaleString()
+                    if (sale.saleItems && sale.saleItems.length > 0) {
+                        for (const item of sale.saleItems) {
+                            rows.push([
+                                sale.id,
+                                dateStr,
+                                sale.payment_mode,
+                                item.product?.product_name ?? '',
+                                item.product?.category ?? '',
+                                item.quantity,
+                                item.unit_price,
+                                (item.quantity * item.unit_price).toFixed(2),
+                                sale.total.toFixed(2)
+                            ])
+                        }
+                    } else {
+                        rows.push([sale.id, dateStr, sale.payment_mode, '', '', '', '', '', sale.total.toFixed(2)])
+                    }
+                }
+
+                const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `sales_${start}_to_${end}.csv`
+                a.click()
+                URL.revokeObjectURL(url)
+            } finally {
+                exportLoading.value = false
+            }
+        }
+
         // Fetch top selling item whenever date range changes
         watchEffect(async() => {
             const d = new Date(currentDate.value)
@@ -392,7 +464,9 @@ export default {
             applyCustomRange,
             topSellingItem,
             takoyakiImg,
-            bukoImg
+            bukoImg,
+            exportToCSV,
+            exportLoading
         }
     }
 }
@@ -431,6 +505,30 @@ export default {
 .back-btn:hover {
     background: #f5f5f5;
     border-color: #007bff;
+}
+
+.export-btn {
+    margin-left: auto;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.export-btn:hover:not(:disabled) {
+    background: #218838;
+}
+
+.export-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .page-title {
