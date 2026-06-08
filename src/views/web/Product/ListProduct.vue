@@ -6,6 +6,12 @@
             <div class="row p-1">
                 <div class="col-md-1"></div>
                 <div class="col-md-10">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button class="btn btn-success btn-sm d-flex align-items-center gap-1" @click="exportToCSV">
+                            <mdicon name="download" size="16"/>
+                            Export CSV
+                        </button>
+                    </div>
                     <table class="table table-striped">
                         <thead class=thead-dark>
                             <tr>
@@ -81,11 +87,27 @@ export default {
             loading.value = false
         })
 
+        const exportToCSV = () => {
+            const rows = [['product_id', 'product_name', 'category', 'cost', 'price']]
+            for (const p of (productLists.value || [])) {
+                rows.push([p.product_id, p.product_name, p.category, p.cost, p.price])
+            }
+            const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'products.csv'
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
         return {
             router,
             loading,
             user,
             productLists,
+            exportToCSV,
         }
     }
 }

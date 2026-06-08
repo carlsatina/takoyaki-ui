@@ -121,6 +121,40 @@
                 </div>
                 <div class="col-md-1"></div>
             </div>
+
+            <hr>
+
+            <div class="row mb-4">
+                <div class="col-md-1"></div>
+                <div class="col-md-10">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 fw-bold">Product List</h6>
+                        <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-1" @click="exportToCSV">
+                            <mdicon name="download" size="16"/>
+                            Export CSV
+                        </button>
+                    </div>
+                    <table class="table table-striped table-sm">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Cost</th>
+                                <th>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="item in productLists" :key="item.product_id">
+                                <td>{{ item.product_name }}</td>
+                                <td>{{ item.category }}</td>
+                                <td>₱{{ item.cost }}</td>
+                                <td>₱{{ item.price }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-1"></div>
+            </div>
         </div>
         <!-- New UI ends here -->
 
@@ -137,6 +171,7 @@ import Modal from '@/components/Modal.vue'
 import Loading from '@/components/Loading.vue'
 import getProfile from '@/composables/getProfile'
 import addProduct from '@/composables/products/addProduct'
+import getAllProduct from '@/composables/products/getAllProduct'
 import getAllRecipe from '@/composables/recipe/getAllRecipe'
 import getAllPackaging from '@/composables/packaging/getAllPackaging'
 import store from '@/store'
@@ -177,6 +212,7 @@ export default {
         const bottle = ref()
         const cups = ref()
         const productPackaging = ref([])
+        const productLists = ref([])
 
         provide('store', store)
 
@@ -199,6 +235,11 @@ export default {
                 boxPackage.value = listPackaging.value.filter(item => item.name.toLowerCase().includes('box'))
                 bottle.value = listPackaging.value.filter(item => item.name.toLowerCase().includes('bottle'))
                 cups.value = listPackaging.value.filter(item => item.name.toLowerCase().includes('cups'))
+            }
+
+            const products = await getAllProduct(userToken)
+            if (products.error.value === null) {
+                productLists.value = products.response.value
             }
 
             loading.value = false
@@ -229,6 +270,22 @@ export default {
             const recipe = listRecipes.value.find(item => item.id == productInfo.value.recipe_id)
             productInfo.value.product_name = recipe.name
         }
+
+        const exportToCSV = () => {
+            const rows = [['product_id', 'product_name', 'category', 'cost', 'price']]
+            for (const p of (productLists.value || [])) {
+                rows.push([p.product_id, p.product_name, p.category, p.cost, p.price])
+            }
+            const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = 'products.csv'
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+
         return {
             router,
             services,
@@ -247,7 +304,9 @@ export default {
             boxPackage,
             bottle,
             cups,
-            productPackaging
+            productPackaging,
+            productLists,
+            exportToCSV,
         }
     }
 }

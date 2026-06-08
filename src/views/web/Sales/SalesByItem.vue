@@ -378,16 +378,21 @@ export default {
                 if (error.value !== null || !response.value) return
 
                 const sales = response.value
-                const rows = [['sale_id', 'date', 'payment_mode', 'product_name', 'category', 'quantity', 'unit_price', 'line_total', 'sale_total']]
+                const rows = [['sale_id', 'date', 'staff', 'payment_mode', 'senior_discount', 'product_name', 'category', 'quantity', 'unit_price', 'line_total', 'sale_total']]
 
                 for (const sale of sales) {
                     const dateStr = new Date(sale.date).toLocaleString()
+                    const staff = sale.user_info?.full_name ?? ''
+                    const theoreticalTotal = (sale.saleItems || []).reduce((sum, item) => sum + item.quantity * item.unit_price, 0)
+                    const seniorDiscount = Math.max(theoreticalTotal - sale.total, 0).toFixed(2)
                     if (sale.saleItems && sale.saleItems.length > 0) {
                         for (const item of sale.saleItems) {
                             rows.push([
                                 sale.id,
                                 dateStr,
+                                staff,
                                 sale.payment_mode,
+                                seniorDiscount,
                                 item.product?.product_name ?? '',
                                 item.product?.category ?? '',
                                 item.quantity,
@@ -397,7 +402,7 @@ export default {
                             ])
                         }
                     } else {
-                        rows.push([sale.id, dateStr, sale.payment_mode, '', '', '', '', '', sale.total.toFixed(2)])
+                        rows.push([sale.id, dateStr, staff, sale.payment_mode, seniorDiscount, '', '', '', '', '', sale.total.toFixed(2)])
                     }
                 }
 
