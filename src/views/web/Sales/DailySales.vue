@@ -8,9 +8,14 @@
           <small class="text-muted">Review per-day totals and staff cash entries</small>
         </div>
       </div>
-      <button class="btn btn-primary" @click="startAddRow" :disabled="addingRow">
-        Add Entry
-      </button>
+      <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" @click="exportCsv" :disabled="filteredSales.length === 0">
+          Export CSV
+        </button>
+        <button class="btn btn-primary" @click="startAddRow" :disabled="addingRow">
+          Add Entry
+        </button>
+      </div>
     </div>
 
     <div class="table-card shadow-sm">
@@ -1106,6 +1111,51 @@ export default {
       return sum
     }
 
+    const escapeCsv = (val) => {
+      const s = String(val ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+
+    const exportCsv = () => {
+      if (filteredSales.value.length === 0) return
+      const admin = !isStaffOnly.value
+      const columns = [
+        { header: 'Date', value: (e) => `${formatDate(e.record_date)} (${formatDay(e.record_date)})`, total: () => 'Total' },
+        { header: `COH (${staffLabels.value[1]})`, value: (e) => staffField(e, 1, 'cash_on_hand'), total: () => totalColumn('staff_coh_1') },
+        { header: `COH (${staffLabels.value[0]})`, value: (e) => staffField(e, 0, 'cash_on_hand'), total: () => totalColumn('staff_coh_0') },
+        { header: `GCash (${staffLabels.value[1]})`, value: (e) => staffField(e, 1, 'gcash'), total: () => totalColumn('staff_gcash_1') },
+        { header: `GCash (${staffLabels.value[0]})`, value: (e) => staffField(e, 0, 'gcash'), total: () => totalColumn('staff_gcash_0') },
+        admin && { header: 'Senior', value: (e) => Number(e.senior_discount) || 0, total: () => totalColumn('senior_discount') },
+        { header: 'Expense', value: (e) => expenseTotal(e), total: () => totalColumn('expense') },
+        admin && { header: 'Total GCash', value: (e) => totalGcash(e), total: () => totalColumn('total_gcash') },
+        admin && { header: 'Total COH', value: (e) => totalCoh(e), total: () => totalColumn('total_coh') },
+        admin && { header: 'Total Sales', value: (e) => calcTotalSales(e), total: () => totalColumn('total_sales') },
+        admin && { header: 'POS', value: (e) => Number(e.pos_cash_on_hand) || 0, total: () => totalColumn('pos_cash_on_hand') },
+        admin && { header: 'Actual COH', value: (e) => Number(e.actual_cash_on_hand) || 0, total: () => totalColumn('actual_cash_on_hand') },
+        admin && { header: 'Kulang Remit', value: (e) => (Number(e.total_cash_on_hand) || 0) - (Number(e.actual_cash_on_hand) || 0), total: () => '' },
+        admin && { header: 'Short if (-)', value: (e) => (Number(e.total_sales) || 0) - (Number(e.pos_cash_on_hand) || 0), total: () => '' },
+        admin && { header: 'Sales Needed', value: (e) => calcSalesNeeded(e), total: () => '' }
+      ].filter(Boolean)
+
+      const rows = [columns.map((c) => c.header)]
+      filteredSales.value.forEach((e) => rows.push(columns.map((c) => c.value(e))))
+      if (admin) rows.push(columns.map((c) => c.total()))
+
+      const csv = rows.map((r) => r.map(escapeCsv).join(',')).join('\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const label = viewMode.value === 'all'
+        ? 'all'
+        : monthLabel.value.replace(/\s+/g, '-').toLowerCase()
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `daily-sales-${label}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
+
     const shortfallClass = (entry) => {
       const val = cashShort(entry)
       return val > 0 ? 'text-danger fw-bold' : 'text-muted'
@@ -1332,6 +1382,7 @@ export default {
       shiftMonth,
       paginatedSales,
       totalColumn,
+      exportCsv,
       showDeleteModal,
       confirmDelete,
       closeDeleteModal,
